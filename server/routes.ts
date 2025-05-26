@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertQuizSchema, insertQuizAttemptSchema } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
-import * as pdfParse from "pdf-parse";
+// Simplified PDF processing - we'll use the existing pdf2json package
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -28,21 +28,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No PDF file uploaded" });
       }
 
-      // Use pdf-parse to extract text from PDF buffer
-      const pdfData = await pdfParse(req.file.buffer);
+      // Use dynamic import for pdf2json
+      const { default: PDFParser } = await import('pdf2json');
+      const pdfParser = new PDFParser(null, 1);
       
-      if (!pdfData.text || pdfData.text.trim().length < 100) {
-        return res.status(400).json({ 
-          message: "PDF appears to be empty or contains very little readable text. Please ensure the PDF contains text content that can be extracted." 
-        });
-      }
+      let extractedText = '';
+      let pageCount = 0;
+      let hasResponded = false;
 
-      res.json({
-        content: pdfData.text.trim(),
-        pageCount: pdfData.numpages || 1,
-        fileName: req.file.originalname,
-        fileSize: req.file.size,
+      pdfParser.on("pdfParser_dataError", (errData: any) => {
+        if (!hasResponded) {
+          hasResponded = true;
+          console.error('PDF parsing error:', errData.parserError);
+          res.status(500).json({ 
+            message: "Failed to process PDF. Please ensure the file is a valid PDF with readable text content." 
+          });
+        }
       });
+
+      pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+        if (hasResponded) return;
+        
+        try {
+          // Extract text from all pages
+          if (pdfData.Pages) {
+            pageCount = pdfData.Pages.length;
+            
+            pdfData.Pages.forEach((page: any) => {
+              if (page.Texts) {
+                page.Texts.forEach((textItem: any) => {
+                  if (textItem.R) {
+                    textItem.R.forEach((textRun: any) => {
+                      if (textRun.T) {
+                        extractedText += decodeURIComponent(textRun.T) + ' ';
+                      }
+                    });
+                  }
+                });
+              }
+            });
+          }
+
+          extractedText = extractedText.trim();
+          
+          if (!extractedText || extractedText.length < 100) {
+            hasResponded = true;
+            return res.status(400).json({ 
+              message: "PDF appears to be empty or contains very little readable text. Please ensure the PDF contains text content that can be extracted." 
+            });
+          }
+
+          hasResponded = true;
+          res.json({
+            content: extractedText,
+            pageCount: pageCount || 1,
+            fileName: req.file.originalname,
+            fileSize: req.file.size,
+          });
+          
+        } catch (processingError) {
+          if (!hasResponded) {
+            hasResponded = true;
+            console.error('Text extraction error:', processingError);
+            res.status(500).json({ 
+              message: "Failed to extract text from PDF. Please ensure the file contains readable text content." 
+            });
+          }
+        }
+      });
+
+      // Parse the PDF buffer
+      pdfParser.parseBuffer(req.file.buffer);
 
     } catch (error) {
       console.error('PDF processing error:', error);

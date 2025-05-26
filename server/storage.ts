@@ -43,7 +43,14 @@ export class DatabaseStorage implements IStorage {
     
     const [quiz] = await db
       .insert(quizzes)
-      .values(insertQuiz)
+      .values({
+        fileName: insertQuiz.fileName,
+        fileSize: insertQuiz.fileSize,
+        content: insertQuiz.content,
+        questionCount: insertQuiz.questionCount,
+        questions: insertQuiz.questions,
+        createdAt: new Date().toISOString(),
+      })
       .returning();
     return quiz;
   }
@@ -72,7 +79,12 @@ export class DatabaseStorage implements IStorage {
   async createQuizAttempt(insertAttempt: InsertQuizAttempt): Promise<QuizAttempt> {
     const [attempt] = await db
       .insert(quizAttempts)
-      .values(insertAttempt)
+      .values({
+        quizId: insertAttempt.quizId,
+        answers: insertAttempt.answers,
+        score: insertAttempt.score,
+        completedAt: new Date().toISOString(),
+      })
       .returning();
     return attempt;
   }
