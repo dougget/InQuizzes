@@ -30,7 +30,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Use dynamic import for pdf2json
       const { default: PDFParser } = await import('pdf2json');
-      const pdfParser = new PDFParser(null, 1);
+      const pdfParser = new PDFParser();
       
       let extractedText = '';
       let pageCount = 0;
@@ -119,15 +119,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Call DeepSeek API to generate questions
-      const deepseekApiKey = process.env.DEEPSEEK_API_KEY || 'sk-f1f24f660e174bda83db5f277a62be71';
+      // Call OpenRouter API to generate questions
+      const openrouterApiKey = process.env.OPENROUTER_API_KEY;
       
-      if (!deepseekApiKey) {
-        return res.status(500).json({ message: "DeepSeek API key not configured" });
+      if (!openrouterApiKey) {
+        return res.status(500).json({ message: "OpenRouter API key not configured" });
       }
 
       // Split content into chunks if it's too long for the API
-      const maxChunkSize = 8000; // Conservative token limit
+      const maxChunkSize = 12000; // OpenRouter can handle larger chunks
       const chunks = splitContentIntoChunks(content, maxChunkSize);
       
       let allQuestions: any[] = [];
@@ -141,14 +141,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (chunkQuestionCount <= 0) break;
 
         try {
-          const response = await fetch('https://api.deepseek.com/chat/completions', {
+          const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${deepseekApiKey}`,
+              'Authorization': `Bearer ${openrouterApiKey}`,
+              'HTTP-Referer': 'https://inquizzes.app',
+              'X-Title': 'inQuizzes - Document Quiz Generator',
             },
             body: JSON.stringify({
-              model: 'deepseek-chat',
+              model: 'anthropic/claude-3-haiku',
               messages: [
                 {
                   role: 'system',
@@ -180,7 +182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
 
           if (!response.ok) {
-            console.error(`DeepSeek API error for chunk ${i}:`, response.status, await response.text());
+            console.error(`OpenRouter API error for chunk ${i}:`, response.status, await response.text());
             continue;
           }
 
