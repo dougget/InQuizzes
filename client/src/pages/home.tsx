@@ -1,16 +1,16 @@
 import { useState, useCallback } from "react";
+import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { useTheme } from "@/components/theme-provider";
+import { processPDFFile, type ProcessedDocument } from "@/lib/pdf-processor";
 import { generateQuiz, submitQuizAttempt, type QuizGenerationProgress } from "@/lib/deepseek";
-import { Brain, Sun, Moon, ChevronLeft, ChevronRight, Trophy, RotateCcw, CheckCircle, XCircle, AlertCircle, FileText } from "lucide-react";
+import { Brain, Sun, Moon, Upload, FileText, ChevronLeft, ChevronRight, Trophy, RotateCcw, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import type { Quiz } from "@shared/schema";
 
 interface QuizState {
@@ -23,9 +23,9 @@ interface QuizState {
 
 export default function Home() {
   const { theme, setTheme } = useTheme();
-  const [textContent, setTextContent] = useState<string>('');
-  const [fileName, setFileName] = useState<string>('');
+  const [document, setDocument] = useState<ProcessedDocument | null>(null);
   const [questionCount, setQuestionCount] = useState([25]);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState<QuizGenerationProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,11 +37,45 @@ export default function Home() {
     results: null,
   });
 
-  const handleGenerateQuiz = async () => {
-    if (!textContent.trim() || textContent.length < 100) {
-      setError('Please provide at least 100 characters of text content.');
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      setError('Please upload a PDF file only.');
       return;
     }
+
+    if (file.size > 15 * 1024 * 1024) {
+      setError('File size must be less than 15MB.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      const processedDoc = await processPDFFile(file);
+      setDocument(processedDoc);
+    } catch (error) {
+      console.error('PDF processing error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to process PDF file.');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf']
+    },
+    maxSize: 15 * 1024 * 1024,
+    multiple: false,
+  });
+
+  const handleGenerateQuiz = async () => {
+    if (!document) return;
 
     setIsGenerating(true);
     setError(null);
@@ -49,9 +83,9 @@ export default function Home() {
 
     try {
       const quiz = await generateQuiz({
-        content: textContent.trim(),
-        fileName: fileName || 'Text Content',
-        fileSize: textContent.length,
+        content: document.content,
+        fileName: document.fileName,
+        fileSize: document.fileSize,
         questionCount: questionCount[0],
       }, setProgress);
 
@@ -63,7 +97,7 @@ export default function Home() {
         results: null,
       });
     } catch (error) {
-      console.error('Error generating quiz:', error);
+      console.error('Quiz generation error:', error);
       setError(error instanceof Error ? error.message : 'Failed to generate quiz. Please try again.');
     } finally {
       setIsGenerating(false);
@@ -117,7 +151,7 @@ export default function Home() {
         results,
       }));
     } catch (error) {
-      console.error('Error submitting quiz:', error);
+      console.error('Quiz submission error:', error);
       setError('Failed to submit quiz. Please try again.');
     }
   };
@@ -132,9 +166,8 @@ export default function Home() {
     }));
   };
 
-  const handleStartOver = () => {
-    setTextContent('');
-    setFileName('');
+  const handleUploadNewDocument = () => {
+    setDocument(null);
     setQuizState({
       quiz: null,
       currentQuestionIndex: 0,
@@ -179,50 +212,56 @@ export default function Home() {
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Hero Section */}
-        {!quizState.quiz && !quizState.showResults && (
+        {!document && !quizState.quiz && !quizState.showResults && (
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold mb-4">
-              Turn Text Content into <span className="text-primary">Smart Quizzes</span>
+              Turn Documents into <span className="text-primary">Smart Quizzes</span>
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Paste your study material and generate AI-powered quizzes to test your understanding. Perfect for students, professionals, and lifelong learners.
+              Upload your PDF documents and generate AI-powered quizzes to test your understanding. Perfect for students, professionals, and lifelong learners.
             </p>
           </div>
         )}
 
-        {/* Content Input Section */}
-        {!quizState.quiz && !quizState.showResults && (
+        {/* Upload Section */}
+        {!document && !quizState.quiz && !quizState.showResults && (
           <Card className="mb-8">
             <CardContent className="p-8">
-              {/* Document Name Input */}
-              <div className="mb-6">
-                <Label htmlFor="fileName" className="text-sm font-medium mb-2 block">
-                  Document Name (Optional)
-                </Label>
-                <Input
-                  id="fileName"
-                  value={fileName}
-                  onChange={(e) => setFileName(e.target.value)}
-                  placeholder="e.g., Chapter 5: Photosynthesis"
-                  className="w-full"
-                />
-              </div>
-
-              {/* Text Content Input */}
-              <div className="mb-8">
-                <Label htmlFor="textContent" className="text-sm font-medium mb-2 block">
-                  Text Content <span className="text-destructive">*</span>
-                </Label>
-                <Textarea
-                  id="textContent"
-                  value={textContent}
-                  onChange={(e) => setTextContent(e.target.value)}
-                  placeholder="Paste your study material here (minimum 100 characters)..."
-                  className="min-h-[200px] w-full resize-y"
-                />
-                <p className="text-sm text-muted-foreground mt-2">
-                  Characters: {textContent.length} / 100 minimum
-                </p>
+              {/* File Upload Zone */}
+              <div
+                {...getRootProps()}
+                className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors mb-8 ${
+                  isDragActive 
+                    ? 'border-primary bg-primary/5' 
+                    : 'border-muted-foreground/25 hover:border-primary'
+                }`}
+              >
+                <input {...getInputProps()} />
+                
+                <div className="space-y-4">
+                  <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
+                    {isProcessing ? (
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    ) : (
+                      <Upload className="text-2xl text-muted-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    {isProcessing ? (
+                      <p className="text-lg font-medium mb-2">Processing PDF...</p>
+                    ) : (
+                      <>
+                        <p className="text-lg font-medium mb-2">
+                          {isDragActive ? "Drop your PDF here" : "Drop your PDF here"}
+                        </p>
+                        <p className="text-muted-foreground">
+                          or <span className="text-primary font-medium">browse files</span>
+                        </p>
+                      </>
+                    )}
+                    <p className="text-sm text-muted-foreground mt-2">PDF only • Max 15MB</p>
+                  </div>
+                </div>
               </div>
 
               {error && (
@@ -233,6 +272,34 @@ export default function Home() {
                   </AlertDescription>
                 </Alert>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Document Processed Section */}
+        {document && !quizState.quiz && !quizState.showResults && (
+          <Card className="mb-8">
+            <CardContent className="p-8">
+              {/* Document Info */}
+              <div className="flex items-center space-x-4 mb-8">
+                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                  <FileText className="text-green-600 dark:text-green-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold">{document.fileName}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {(document.fileSize / (1024 * 1024)).toFixed(1)} MB • {document.pageCount} pages
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleUploadNewDocument}
+                  className="flex items-center space-x-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span>Upload New</span>
+                </Button>
+              </div>
 
               {/* Quiz Settings */}
               <div className="space-y-6 mb-8">
@@ -260,7 +327,7 @@ export default function Home() {
               {/* Generate Button */}
               <Button 
                 onClick={handleGenerateQuiz}
-                disabled={!textContent.trim() || textContent.length < 100 || isGenerating}
+                disabled={isGenerating}
                 className="w-full py-4 text-lg font-semibold"
                 size="lg"
               >
@@ -283,6 +350,15 @@ export default function Home() {
                   </div>
                   <Progress value={progress.progress} />
                 </div>
+              )}
+
+              {error && (
+                <Alert className="mt-4 border-destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-destructive">
+                    {error}
+                  </AlertDescription>
+                </Alert>
               )}
             </CardContent>
           </Card>
@@ -395,9 +471,9 @@ export default function Home() {
                     <RotateCcw className="h-4 w-4" />
                     <span>Retake Quiz</span>
                   </Button>
-                  <Button onClick={handleStartOver} variant="outline" className="flex items-center space-x-2">
-                    <FileText className="h-4 w-4" />
-                    <span>New Quiz</span>
+                  <Button onClick={handleUploadNewDocument} variant="outline" className="flex items-center space-x-2">
+                    <Upload className="h-4 w-4" />
+                    <span>New Document</span>
                   </Button>
                 </div>
               </CardContent>

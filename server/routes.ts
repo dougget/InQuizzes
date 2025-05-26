@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertQuizSchema, insertQuizAttemptSchema } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
+import * as pdfParse from "pdf-parse";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -20,25 +21,34 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Accept text content directly for quiz generation
-  app.post("/api/upload-text", async (req, res) => {
+  // Process PDF files and extract text content
+  app.post("/api/process-pdf", upload.single('pdf'), async (req: any, res) => {
     try {
-      const { content, fileName } = req.body;
+      if (!req.file) {
+        return res.status(400).json({ message: "No PDF file uploaded" });
+      }
+
+      // Use pdf-parse to extract text from PDF buffer
+      const pdfData = await pdfParse(req.file.buffer);
       
-      if (!content || content.length < 100) {
+      if (!pdfData.text || pdfData.text.trim().length < 100) {
         return res.status(400).json({ 
-          message: "Text content is required and must be at least 100 characters long." 
+          message: "PDF appears to be empty or contains very little readable text. Please ensure the PDF contains text content that can be extracted." 
         });
       }
 
       res.json({
-        content: content.trim(),
-        fileName: fileName || 'Text Content',
-        fileSize: content.length,
+        content: pdfData.text.trim(),
+        pageCount: pdfData.numpages || 1,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
       });
+
     } catch (error) {
-      console.error('Text processing error:', error);
-      res.status(500).json({ message: "Failed to process text content." });
+      console.error('PDF processing error:', error);
+      res.status(500).json({ 
+        message: "Failed to process PDF. Please ensure the file is a valid PDF with readable text content." 
+      });
     }
   });
 
