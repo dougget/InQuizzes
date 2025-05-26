@@ -1,17 +1,24 @@
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Use a more reliable worker setup for the Replit environment
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/node_modules/pdfjs-dist/build/pdf.worker.mjs';
-
 export interface ParsedPDF {
   content: string;
   pageCount: number;
 }
 
+// Configure PDF.js to work without a worker (slower but more reliable)
+pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+
 export async function parsePDF(file: File): Promise<ParsedPDF> {
   try {
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    
+    // Use PDF.js without worker for better compatibility
+    const pdf = await pdfjsLib.getDocument({
+      data: arrayBuffer,
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    }).promise;
     
     let fullText = '';
     const pageCount = pdf.numPages;
