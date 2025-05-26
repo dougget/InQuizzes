@@ -1,7 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Set worker source
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+// Set worker source to match the installed version
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.2.133/pdf.worker.min.js`;
 
 export interface ParsedPDF {
   content: string;
