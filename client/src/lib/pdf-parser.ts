@@ -1,52 +1,27 @@
-import * as pdfjsLib from 'pdfjs-dist';
-
 export interface ParsedPDF {
   content: string;
   pageCount: number;
 }
 
-// Configure PDF.js to work without a worker (slower but more reliable)
-pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-
 export async function parsePDF(file: File): Promise<ParsedPDF> {
   try {
-    const arrayBuffer = await file.arrayBuffer();
-    
-    // Use PDF.js without worker for better compatibility
-    const pdf = await pdfjsLib.getDocument({
-      data: arrayBuffer,
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      useSystemFonts: true,
-    }).promise;
-    
-    let fullText = '';
-    const pageCount = pdf.numPages;
-    
-    for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      
-      fullText += pageText + '\n\n';
+    const formData = new FormData();
+    formData.append('pdf', file);
+
+    const response = await fetch('/api/upload-pdf', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to parse PDF');
     }
-    
-    // Clean up the text
-    const cleanedText = fullText
-      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-      .replace(/\n\s*\n/g, '\n\n') // Normalize line breaks
-      .trim();
-    
-    if (!cleanedText || cleanedText.length < 100) {
-      throw new Error('PDF appears to be empty or contains very little text. Please ensure the PDF contains readable text content.');
-    }
-    
+
+    const data = await response.json();
     return {
-      content: cleanedText,
-      pageCount,
+      content: data.content,
+      pageCount: data.pageCount,
     };
   } catch (error) {
     console.error('PDF parsing error:', error);
