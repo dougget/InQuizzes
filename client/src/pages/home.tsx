@@ -26,10 +26,13 @@ interface QuizState {
 export default function Home() {
   const { theme, setTheme } = useTheme();
   const [file, setFile] = useState<File | null>(null);
+  const [textContent, setTextContent] = useState<string>('');
+  const [fileName, setFileName] = useState<string>('');
   const [questionCount, setQuestionCount] = useState([25]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState<QuizGenerationProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [useTextInput, setUseTextInput] = useState(false);
   const [quizState, setQuizState] = useState<QuizState>({
     quiz: null,
     currentQuestionIndex: 0,

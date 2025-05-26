@@ -49,12 +49,10 @@ export interface UserAnswer {
 
 export const insertQuizSchema = createInsertSchema(quizzes).omit({
   id: true,
-  createdAt: true,
 });
 
 export const insertQuizAttemptSchema = createInsertSchema(quizAttempts).omit({
   id: true,
-  completedAt: true,
 });
 
 export type InsertQuiz = z.infer<typeof insertQuizSchema>;

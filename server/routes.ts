@@ -4,7 +4,6 @@ import { storage } from "./storage";
 import { insertQuizSchema, insertQuizAttemptSchema } from "@shared/schema";
 import multer from "multer";
 import { z } from "zod";
-import pdfParse from "pdf-parse";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -21,30 +20,25 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Upload and parse PDF file
-  app.post("/api/upload-pdf", upload.single('pdf'), async (req, res) => {
+  // Accept text content directly for quiz generation
+  app.post("/api/upload-text", async (req, res) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No PDF file uploaded" });
-      }
-
-      const pdfData = await pdfParse(req.file.buffer);
+      const { content, fileName } = req.body;
       
-      if (!pdfData.text || pdfData.text.length < 100) {
+      if (!content || content.length < 100) {
         return res.status(400).json({ 
-          message: "PDF appears to be empty or contains very little text. Please ensure the PDF contains readable text content." 
+          message: "Text content is required and must be at least 100 characters long." 
         });
       }
 
       res.json({
-        content: pdfData.text.trim(),
-        pageCount: pdfData.numpages,
-        fileName: req.file.originalname,
-        fileSize: req.file.size,
+        content: content.trim(),
+        fileName: fileName || 'Text Content',
+        fileSize: content.length,
       });
     } catch (error) {
-      console.error('PDF parsing error:', error);
-      res.status(500).json({ message: "Failed to parse PDF. Please ensure the file is a valid PDF with readable text content." });
+      console.error('Text processing error:', error);
+      res.status(500).json({ message: "Failed to process text content." });
     }
   });
 
@@ -159,6 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content,
         questionCount: allQuestions.length,
         questions: allQuestions,
+        createdAt: new Date().toISOString(),
       });
 
       res.json(quiz);
@@ -220,6 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quizId,
         answers: processedAnswers,
         score,
+        completedAt: new Date().toISOString(),
       });
 
       res.json({

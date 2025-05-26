@@ -43,10 +43,7 @@ export class DatabaseStorage implements IStorage {
     
     const [quiz] = await db
       .insert(quizzes)
-      .values({
-        ...insertQuiz,
-        createdAt: new Date().toISOString(),
-      })
+      .values(insertQuiz)
       .returning();
     return quiz;
   }
@@ -75,10 +72,7 @@ export class DatabaseStorage implements IStorage {
   async createQuizAttempt(insertAttempt: InsertQuizAttempt): Promise<QuizAttempt> {
     const [attempt] = await db
       .insert(quizAttempts)
-      .values({
-        ...insertAttempt,
-        completedAt: new Date().toISOString(),
-      })
+      .values(insertAttempt)
       .returning();
     return attempt;
   }
