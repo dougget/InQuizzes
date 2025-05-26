@@ -1,0 +1,66 @@
+Build a Document-Based Quiz Generator Web App called inQuizzes using AI
+
+Objective:
+Create a web app called inQuizzes that allows students to upload a PDF document (up to 15MB) and receive a high-quality, AI-generated quiz to test their understanding of the document’s content. The app uses DeepSeek's free-tier API for question generation and emphasizes quality and relevance in its output.
+
+Core Requirements:
+
+📄 Document Handling
+Accept only PDF files.
+
+Enforce a maximum file size of 15MB.
+
+Extract document content locally in the browser or backend, without using external services.
+
+If the document exceeds DeepSeek’s token limit, split the content into smaller, manageable chunks and process them sequentially or in parallel, ensuring questions cover the full document.
+
+🧠 AI Integration
+Use DeepSeek API (free tier) for generating quiz questions.
+
+Ensure questions are:
+
+Highly elaborate and content-focused.
+
+Free from any reference to metadata (e.g., title, headings, structure).
+
+Generate up to 50 questions as per user selection.
+
+💡 UX/UI Specifications
+A minimalist, elegant design.
+
+Dark/light mode switching:
+
+Auto-switch based on user's system preferences.
+
+Manual toggle button to override.
+
+Drag-and-drop + file picker zone with:
+
+Visual indicators for PDF-only and 15MB limit.
+
+A single slider for selecting the number of questions (1–50).
+
+A single "Generate Quiz" button that:
+
+Doubles as a loading/progress bar during document processing and quiz generation.
+
+On quiz completion:
+
+Display all generated questions.
+
+For incorrectly answered ones, show the correct answer with a brief explanation.
+
+Tech Stack Suggestions:
+
+Frontend: React (with Tailwind or minimal CSS-in-JS), optionally Next.js
+
+Backend: Node.js with Express or serverless functions (e.g., Vercel, Cloudflare Workers)
+
+PDF Parsing: pdfjs-dist or pdf-parse for Node.js
+
+State Management: Context API or Zustand
+
+AI Call Management: Axios/fetch with error and token handling logic for DeepSeek
+
+Final Note:
+Prioritize user experience and quiz accuracy over speed. The goal is to help learners deeply reflect on their understanding.
