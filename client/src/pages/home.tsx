@@ -1,19 +1,17 @@
 import { useState, useCallback } from "react";
-import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useTheme } from "@/components/theme-provider";
-import { parsePDF } from "@/lib/pdf-parser";
 import { generateQuiz, submitQuizAttempt, type QuizGenerationProgress } from "@/lib/deepseek";
-import { Brain, Upload, FileText, Sun, Moon, ChevronLeft, ChevronRight, Trophy, RotateCcw, Upload as UploadIcon, CheckCircle, XCircle, AlertCircle } from "lucide-react";
-import type { Quiz, QuizQuestion, UserAnswer } from "@shared/schema";
+import { Brain, Sun, Moon, ChevronLeft, ChevronRight, Trophy, RotateCcw, CheckCircle, XCircle, AlertCircle, FileText } from "lucide-react";
+import type { Quiz } from "@shared/schema";
 
 interface QuizState {
   quiz: Quiz | null;
@@ -25,14 +23,12 @@ interface QuizState {
 
 export default function Home() {
   const { theme, setTheme } = useTheme();
-  const [file, setFile] = useState<File | null>(null);
   const [textContent, setTextContent] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
   const [questionCount, setQuestionCount] = useState([25]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState<QuizGenerationProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [useTextInput, setUseTextInput] = useState(false);
   const [quizState, setQuizState] = useState<QuizState>({
     quiz: null,
     currentQuestionIndex: 0,
@@ -41,53 +37,21 @@ export default function Home() {
     results: null,
   });
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const selectedFile = acceptedFiles[0];
-    if (selectedFile) {
-      if (selectedFile.type !== 'application/pdf') {
-        setError('Please select a PDF file only.');
-        return;
-      }
-      if (selectedFile.size > 15 * 1024 * 1024) {
-        setError('File size must be less than 15MB.');
-        return;
-      }
-      setFile(selectedFile);
-      setError(null);
-    }
-  }, []);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'application/pdf': ['.pdf']
-    },
-    maxSize: 15 * 1024 * 1024,
-    multiple: false,
-  });
-
   const handleGenerateQuiz = async () => {
-    if (!file) return;
+    if (!textContent.trim() || textContent.length < 100) {
+      setError('Please provide at least 100 characters of text content.');
+      return;
+    }
 
     setIsGenerating(true);
     setError(null);
     setProgress(null);
 
     try {
-      // Parse PDF
-      setProgress({
-        stage: 'extracting',
-        progress: 10,
-        message: 'Extracting PDF content...'
-      });
-
-      const parsedPDF = await parsePDF(file);
-
-      // Generate quiz
       const quiz = await generateQuiz({
-        content: parsedPDF.content,
-        fileName: file.name,
-        fileSize: file.size,
+        content: textContent.trim(),
+        fileName: fileName || 'Text Content',
+        fileSize: textContent.length,
         questionCount: questionCount[0],
       }, setProgress);
 
@@ -168,8 +132,9 @@ export default function Home() {
     }));
   };
 
-  const handleUploadNewDocument = () => {
-    setFile(null);
+  const handleStartOver = () => {
+    setTextContent('');
+    setFileName('');
     setQuizState({
       quiz: null,
       currentQuestionIndex: 0,
@@ -217,56 +182,47 @@ export default function Home() {
         {!quizState.quiz && !quizState.showResults && (
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold mb-4">
-              Turn Documents into <span className="text-primary">Smart Quizzes</span>
+              Turn Text Content into <span className="text-primary">Smart Quizzes</span>
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Upload your PDF documents and generate AI-powered quizzes to test your understanding. Perfect for students, professionals, and lifelong learners.
+              Paste your study material and generate AI-powered quizzes to test your understanding. Perfect for students, professionals, and lifelong learners.
             </p>
           </div>
         )}
 
-        {/* Upload Section */}
+        {/* Content Input Section */}
         {!quizState.quiz && !quizState.showResults && (
           <Card className="mb-8">
             <CardContent className="p-8">
-              {/* File Upload Zone */}
-              <div
-                {...getRootProps()}
-                className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors mb-8 ${
-                  isDragActive 
-                    ? 'border-primary bg-primary/5' 
-                    : file 
-                    ? 'border-green-500 bg-green-50 dark:bg-green-900/10' 
-                    : 'border-muted-foreground/25 hover:border-primary'
-                }`}
-              >
-                <input {...getInputProps()} />
-                
-                {file ? (
-                  <div className="space-y-4">
-                    <div className="w-16 h-16 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                      <CheckCircle className="text-2xl text-green-600 dark:text-green-400" />
-                    </div>
-                    <div>
-                      <p className="text-lg font-medium mb-1">{file.name}</p>
-                      <p className="text-sm text-muted-foreground">{(file.size / (1024 * 1024)).toFixed(1)} MB</p>
-                      <Button variant="link" className="text-primary hover:text-primary/80 text-sm font-medium mt-2">
-                        Change file
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
-                      <FileText className="text-2xl text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-lg font-medium mb-2">Drop your PDF here</p>
-                      <p className="text-muted-foreground">or <span className="text-primary font-medium">browse files</span></p>
-                      <p className="text-sm text-muted-foreground mt-2">PDF only • Max 15MB</p>
-                    </div>
-                  </div>
-                )}
+              {/* Document Name Input */}
+              <div className="mb-6">
+                <Label htmlFor="fileName" className="text-sm font-medium mb-2 block">
+                  Document Name (Optional)
+                </Label>
+                <Input
+                  id="fileName"
+                  value={fileName}
+                  onChange={(e) => setFileName(e.target.value)}
+                  placeholder="e.g., Chapter 5: Photosynthesis"
+                  className="w-full"
+                />
+              </div>
+
+              {/* Text Content Input */}
+              <div className="mb-8">
+                <Label htmlFor="textContent" className="text-sm font-medium mb-2 block">
+                  Text Content <span className="text-destructive">*</span>
+                </Label>
+                <Textarea
+                  id="textContent"
+                  value={textContent}
+                  onChange={(e) => setTextContent(e.target.value)}
+                  placeholder="Paste your study material here (minimum 100 characters)..."
+                  className="min-h-[200px] w-full resize-y"
+                />
+                <p className="text-sm text-muted-foreground mt-2">
+                  Characters: {textContent.length} / 100 minimum
+                </p>
               </div>
 
               {error && (
@@ -304,14 +260,14 @@ export default function Home() {
               {/* Generate Button */}
               <Button 
                 onClick={handleGenerateQuiz}
-                disabled={!file || isGenerating}
+                disabled={!textContent.trim() || textContent.length < 100 || isGenerating}
                 className="w-full py-4 text-lg font-semibold"
                 size="lg"
               >
                 {isGenerating ? (
                   <div className="flex items-center space-x-2">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-foreground"></div>
-                    <span>Processing...</span>
+                    <span>Generating Quiz...</span>
                   </div>
                 ) : (
                   "Generate Quiz"
@@ -427,57 +383,48 @@ export default function Home() {
 
             {/* Score Card */}
             <Card className="mb-8">
-              <CardContent className="p-8">
-                <div className="grid md:grid-cols-3 gap-8 text-center">
-                  <div>
-                    <div className="text-3xl font-bold text-primary mb-2">{quizState.results.score}%</div>
-                    <div className="text-muted-foreground">Overall Score</div>
-                  </div>
-                  <div>
-                    <div className="text-3xl font-bold text-green-600 mb-2">{quizState.results.correctCount}</div>
-                    <div className="text-muted-foreground">Correct Answers</div>
-                  </div>
-                  <div>
-                    <div className="text-3xl font-bold text-red-600 mb-2">
-                      {quizState.results.totalQuestions - quizState.results.correctCount}
-                    </div>
-                    <div className="text-muted-foreground">Incorrect Answers</div>
-                  </div>
+              <CardContent className="p-8 text-center">
+                <div className="text-6xl font-bold text-primary mb-4">
+                  {quizState.results.score}%
+                </div>
+                <p className="text-xl mb-4">
+                  {quizState.results.correctCount} out of {quizState.results.totalQuestions} correct
+                </p>
+                <div className="flex justify-center space-x-4">
+                  <Button onClick={handleRetakeQuiz} className="flex items-center space-x-2">
+                    <RotateCcw className="h-4 w-4" />
+                    <span>Retake Quiz</span>
+                  </Button>
+                  <Button onClick={handleStartOver} variant="outline" className="flex items-center space-x-2">
+                    <FileText className="h-4 w-4" />
+                    <span>New Quiz</span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Review Incorrect Answers */}
+            {/* Incorrect Answers Review */}
             {quizState.results.incorrectAnswers && quizState.results.incorrectAnswers.length > 0 && (
-              <Card className="mb-8">
+              <Card>
                 <CardContent className="p-8">
-                  <h4 className="text-xl font-bold mb-6">Review Incorrect Answers</h4>
-                  
+                  <h4 className="text-xl font-semibold mb-6">Review Incorrect Answers</h4>
                   <div className="space-y-6">
                     {quizState.results.incorrectAnswers.map((item: any, index: number) => (
-                      <div key={index} className="border border-red-200 dark:border-red-800 rounded-lg p-6 bg-red-50 dark:bg-red-900/10">
-                        <div className="flex items-start space-x-3 mb-4">
-                          <div className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center font-semibold text-xs flex-shrink-0 mt-1">
-                            {quizState.quiz?.questions.findIndex(q => q.id === item.question.id) + 1}
+                      <div key={index} className="border rounded-lg p-6">
+                        <p className="font-medium mb-4">{item.question.question}</p>
+                        <div className="space-y-2 mb-4">
+                          <div className="flex items-center space-x-2">
+                            <XCircle className="h-4 w-4 text-destructive" />
+                            <span className="text-sm">Your answer: {item.question.options[item.userAnswer]}</span>
                           </div>
-                          <p className="font-medium">{item.question.question}</p>
+                          <div className="flex items-center space-x-2">
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <span className="text-sm">Correct answer: {item.question.options[item.correctAnswer]}</span>
+                          </div>
                         </div>
-                        <div className="ml-9 space-y-3">
-                          <div className="text-sm">
-                            <span className="text-red-600 font-medium">Your answer:</span>
-                            <span className="text-muted-foreground ml-2">
-                              {item.question.options[item.userAnswer]}
-                            </span>
-                          </div>
-                          <div className="text-sm">
-                            <span className="text-green-600 font-medium">Correct answer:</span>
-                            <span className="text-muted-foreground ml-2">
-                              {item.question.options[item.correctAnswer]}
-                            </span>
-                          </div>
-                          <div className="text-sm text-muted-foreground bg-background p-3 rounded border-l-4 border-green-500">
-                            <strong>Explanation:</strong> {item.question.explanation}
-                          </div>
+                        <div className="bg-muted p-4 rounded-lg">
+                          <p className="text-sm text-muted-foreground mb-1">Explanation:</p>
+                          <p className="text-sm">{item.question.explanation}</p>
                         </div>
                       </div>
                     ))}
@@ -485,39 +432,9 @@ export default function Home() {
                 </CardContent>
               </Card>
             )}
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button
-                onClick={handleRetakeQuiz}
-                className="flex-1 py-3 text-lg font-semibold"
-                size="lg"
-              >
-                <RotateCcw className="mr-2 h-5 w-5" />
-                Retake Quiz
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleUploadNewDocument}
-                className="flex-1 py-3 text-lg font-semibold"
-                size="lg"
-              >
-                <UploadIcon className="mr-2 h-5 w-5" />
-                Upload New Document
-              </Button>
-            </div>
           </div>
         )}
       </main>
-
-      {/* Footer */}
-      <footer className="mt-16 border-t bg-muted/50">
-        <div className="max-w-4xl mx-auto px-4 py-8 text-center">
-          <p className="text-muted-foreground text-sm">
-            Powered by AI • Built for learners • © 2024 inQuizzes
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }
