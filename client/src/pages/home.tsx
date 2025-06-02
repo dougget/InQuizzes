@@ -392,14 +392,14 @@ export default function Home() {
 
                   {/* Answer Options */}
                   <RadioGroup
-                    value={quizState.userAnswers.get(currentQuestion.id)?.toString()}
+                    value={quizState.userAnswers.get(currentQuestion.id)?.toString() || ""}
                     onValueChange={(value) => handleAnswerSelect(currentQuestion.id, parseInt(value))}
                     className="space-y-3"
                   >
                     {currentQuestion.options.map((option, index) => (
-                      <div key={index} className="flex items-start space-x-3 p-4 rounded-lg border hover:bg-muted/50 transition-colors">
-                        <RadioGroupItem value={index.toString()} id={`option-${index}`} className="mt-1" />
-                        <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
+                      <div key={`${currentQuestion.id}-${index}`} className="flex items-start space-x-3 p-4 rounded-lg border hover:bg-muted/50 transition-colors">
+                        <RadioGroupItem value={index.toString()} id={`option-${currentQuestion.id}-${index}`} className="mt-1" />
+                        <Label htmlFor={`option-${currentQuestion.id}-${index}`} className="flex-1 cursor-pointer">
                           {option}
                         </Label>
                       </div>
