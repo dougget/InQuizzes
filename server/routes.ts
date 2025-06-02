@@ -158,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               'X-Title': 'inQuizzes - Document Quiz Generator',
             },
             body: JSON.stringify({
-              model: 'anthropic/claude-3-haiku',
+              model: 'openrouter/auto',
               messages: [
                 {
                   role: 'system',
@@ -250,7 +250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     'X-Title': 'inQuizzes - Document Quiz Generator',
                   },
                   body: JSON.stringify({
-                    model: 'anthropic/claude-3-haiku',
+                    model: 'openrouter/auto',
                     messages: [
                       {
                         role: 'user',
