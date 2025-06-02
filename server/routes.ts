@@ -119,11 +119,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Call OpenRouter API to generate questions
-      const openrouterApiKey = process.env.OPENROUTER_API_KEY;
+      // Call Llama API to generate questions
+      const llamaApiKey = process.env.LLAMA_API_KEY || 'LLM|690657063453165|3GduvZacvjbBcndRMvM3tZg-Zns';
 
-      if (!openrouterApiKey) {
-        return res.status(500).json({ message: "OpenRouter API key not configured" });
+      if (!llamaApiKey) {
+        return res.status(500).json({ message: "Llama API key not configured" });
       }
 
       // Limit content size for very large documents (equivalent to ~200 pages)
@@ -149,16 +149,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (chunkQuestionCount <= 0) break;
 
         try {
-          const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          const response = await fetch('https://api.llama-api.com/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${openrouterApiKey}`,
-              'HTTP-Referer': 'https://inquizzes.app',
-              'X-Title': 'inQuizzes - Document Quiz Generator',
+              'Authorization': `Bearer ${llamaApiKey}`,
             },
             body: JSON.stringify({
-              model: 'meta-llama/llama-3.1-8b-instruct:free',
+              model: 'llama3.1-8b',
               messages: [
                 {
                   role: 'system',
@@ -190,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
 
           if (!response.ok) {
-            console.error(`OpenRouter API error for chunk ${i}:`, response.status, await response.text());
+            console.error(`Llama API error for chunk ${i}:`, response.status, await response.text());
             continue;
           }
 
@@ -241,16 +239,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Retry with a simpler prompt if JSON parsing fails
               try {
                 console.log(`Retrying chunk ${i} with simpler prompt...`);
-                const retryResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                const retryResponse = await fetch('https://api.llama-api.com/chat/completions', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${openrouterApiKey}`,
-                    'HTTP-Referer': 'https://inquizzes.app',
-                    'X-Title': 'inQuizzes - Document Quiz Generator',
+                    'Authorization': `Bearer ${llamaApiKey}`,
                   },
                   body: JSON.stringify({
-                    model: 'meta-llama/llama-3.1-8b-instruct:free',
+                    model: 'llama3.1-8b',
                     messages: [
                       {
                         role: 'user',
