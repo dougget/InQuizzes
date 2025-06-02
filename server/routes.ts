@@ -31,7 +31,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use dynamic import for pdf2json
       const { default: PDFParser } = await import('pdf2json');
       const pdfParser = new PDFParser();
-
+      
       let extractedText = '';
       let pageCount = 0;
       let hasResponded = false;
@@ -48,12 +48,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
         if (hasResponded) return;
-
+        
         try {
           // Extract text from all pages
           if (pdfData.Pages) {
             pageCount = pdfData.Pages.length;
-
+            
             pdfData.Pages.forEach((page: any) => {
               if (page.Texts) {
                 page.Texts.forEach((textItem: any) => {
@@ -70,7 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           extractedText = extractedText.trim();
-
+          
           if (!extractedText || extractedText.length < 100) {
             hasResponded = true;
             return res.status(400).json({ 
@@ -85,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             fileName: req.file.originalname,
             fileSize: req.file.size,
           });
-
+          
         } catch (processingError) {
           if (!hasResponded) {
             hasResponded = true;
@@ -112,18 +112,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/generate-quiz", async (req, res) => {
     try {
       const { content, fileName, fileSize, questionCount } = req.body;
-
+      
       if (!content || !fileName || !fileSize || !questionCount) {
         return res.status(400).json({ 
           message: "Missing required fields: content, fileName, fileSize, questionCount" 
         });
       }
 
-      // Call Llama API to generate questions
-      const llamaApiKey = process.env.LLAMA_API_KEY || 'LLM|690657063453165|3GduvZacvjbBcndRMvM3tZg-Zns';
-
-      if (!llamaApiKey) {
-        return res.status(500).json({ message: "Llama API key not configured" });
+      // Call OpenRouter API to generate questions
+      const openrouterApiKey = process.env.OPENROUTER_API_KEY;
+      
+      if (!openrouterApiKey) {
+        return res.status(500).json({ message: "OpenRouter API key not configured" });
       }
 
       // Limit content size for very large documents (equivalent to ~200 pages)
@@ -137,7 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Split content into chunks if it's too long for the API
       const maxChunkSize = 12000; // OpenRouter can handle larger chunks
       const chunks = splitContentIntoChunks(processContent, maxChunkSize);
-
+      
       let allQuestions: any[] = [];
       const questionsPerChunk = Math.ceil(questionCount / chunks.length);
 
@@ -145,18 +145,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const chunk = chunks[i];
         const remainingQuestions = questionCount - allQuestions.length;
         const chunkQuestionCount = Math.min(questionsPerChunk, remainingQuestions);
-
+        
         if (chunkQuestionCount <= 0) break;
 
         try {
-          const response = await fetch('https://api.llamaapi.com/chat/completions', {
+          const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${llamaApiKey}`,
+              'Authorization': `Bearer ${openrouterApiKey}`,
+              'HTTP-Referer': 'https://inquizzes.app',
+              'X-Title': 'inQuizzes - Document Quiz Generator',
             },
             body: JSON.stringify({
-              model: 'llama3-8b',
+              model: 'anthropic/claude-3-haiku',
               messages: [
                 {
                   role: 'system',
@@ -165,7 +167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   2. Focus purely on content, not metadata or structure
                   3. Have 4 options with only one correct answer
                   4. Include a brief explanation for the correct answer
-
+                  
                   Return ONLY a JSON array with this exact format:
                   [
                     {
@@ -188,34 +190,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
 
           if (!response.ok) {
-            console.error(`Llama API error for chunk ${i}:`, response.status, await response.text());
+            console.error(`OpenRouter API error for chunk ${i}:`, response.status, await response.text());
             continue;
           }
 
           const data = await response.json();
           const content = data.choices?.[0]?.message?.content;
-
+          
           if (content) {
             try {
               // Try to clean and fix common JSON issues
               let cleanedContent = content.trim();
-
+              
               // Remove any markdown code blocks
               cleanedContent = cleanedContent.replace(/```json\s*/g, '').replace(/```\s*/g, '');
-
+              
               // Try to extract JSON array if it's embedded in text
               const jsonMatch = cleanedContent.match(/\[\s*\{[\s\S]*\}\s*\]/);
               if (jsonMatch) {
                 cleanedContent = jsonMatch[0];
               }
-
+              
               // Fix common JSON issues
               cleanedContent = cleanedContent
                 .replace(/,\s*\]/g, ']')  // Remove trailing commas in arrays
                 .replace(/,\s*\}/g, '}')  // Remove trailing commas in objects
                 .replace(/\n/g, ' ')      // Replace newlines with spaces
                 .replace(/\s+/g, ' ');    // Normalize whitespace
-
+              
               const questions = JSON.parse(cleanedContent);
               if (Array.isArray(questions)) {
                 // Validate each question has required fields
@@ -228,25 +230,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   q.correctAnswer >= 0 && q.correctAnswer <= 3 &&
                   typeof q.explanation === 'string'
                 ).slice(0, chunkQuestionCount);
-
+                
                 allQuestions.push(...validQuestions);
                 console.log(`Successfully parsed ${validQuestions.length} questions from chunk ${i}`);
               }
             } catch (parseError) {
               console.error(`Failed to parse questions for chunk ${i}:`, parseError);
               console.log(`Problematic content: ${content.substring(0, 200)}...`);
-
+              
               // Retry with a simpler prompt if JSON parsing fails
               try {
                 console.log(`Retrying chunk ${i} with simpler prompt...`);
-                const retryResponse = await fetch('https://api.llamaapi.com/chat/completions', {
+                const retryResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${llamaApiKey}`,
+                    'Authorization': `Bearer ${openrouterApiKey}`,
+                    'HTTP-Referer': 'https://inquizzes.app',
+                    'X-Title': 'inQuizzes - Document Quiz Generator',
                   },
                   body: JSON.stringify({
-                    model: 'llama3-8b',
+                    model: 'anthropic/claude-3-haiku',
                     messages: [
                       {
                         role: 'user',
@@ -259,7 +263,7 @@ Text: ${chunk.substring(0, 3000)}`
                     temperature: 0.5,
                   }),
                 });
-
+                
                 if (retryResponse.ok) {
                   const retryData = await retryResponse.json();
                   const retryContent = retryData.choices?.[0]?.message?.content;
@@ -316,11 +320,11 @@ Text: ${chunk.substring(0, 3000)}`
     try {
       const id = parseInt(req.params.id);
       const quiz = await storage.getQuiz(id);
-
+      
       if (!quiz) {
         return res.status(404).json({ message: "Quiz not found" });
       }
-
+      
       res.json(quiz);
     } catch (error) {
       console.error('Error fetching quiz:', error);
@@ -333,7 +337,7 @@ Text: ${chunk.substring(0, 3000)}`
     try {
       const quizId = parseInt(req.params.id);
       const { answers } = req.body;
-
+      
       if (!Array.isArray(answers)) {
         return res.status(400).json({ message: "Answers must be an array" });
       }
@@ -349,7 +353,7 @@ Text: ${chunk.substring(0, 3000)}`
         const question = quiz.questions.find(q => q.id === answer.questionId);
         const isCorrect = question && answer.selectedAnswer === question.correctAnswer;
         if (isCorrect) correctCount++;
-
+        
         return {
           questionId: answer.questionId,
           selectedAnswer: answer.selectedAnswer,
