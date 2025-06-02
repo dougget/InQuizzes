@@ -126,9 +126,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "OpenRouter API key not configured" });
       }
 
+      // Limit content size for very large documents (equivalent to ~200 pages)
+      const maxContentLength = 500000; // About 200 pages of text
+      let processContent = content;
+      if (content.length > maxContentLength) {
+        processContent = content.substring(0, maxContentLength);
+        console.log(`Content truncated from ${content.length} to ${maxContentLength} characters for processing`);
+      }
+
       // Split content into chunks if it's too long for the API
       const maxChunkSize = 12000; // OpenRouter can handle larger chunks
-      const chunks = splitContentIntoChunks(content, maxChunkSize);
+      const chunks = splitContentIntoChunks(processContent, maxChunkSize);
       
       let allQuestions: any[] = [];
       const questionsPerChunk = Math.ceil(questionCount / chunks.length);
@@ -191,12 +199,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (content) {
             try {
-              const questions = JSON.parse(content);
+              // Try to clean and fix common JSON issues
+              let cleanedContent = content.trim();
+              
+              // Remove any markdown code blocks
+              cleanedContent = cleanedContent.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+              
+              // Try to extract JSON array if it's embedded in text
+              const jsonMatch = cleanedContent.match(/\[\s*\{[\s\S]*\}\s*\]/);
+              if (jsonMatch) {
+                cleanedContent = jsonMatch[0];
+              }
+              
+              // Fix common JSON issues
+              cleanedContent = cleanedContent
+                .replace(/,\s*\]/g, ']')  // Remove trailing commas in arrays
+                .replace(/,\s*\}/g, '}')  // Remove trailing commas in objects
+                .replace(/\n/g, ' ')      // Replace newlines with spaces
+                .replace(/\s+/g, ' ');    // Normalize whitespace
+              
+              const questions = JSON.parse(cleanedContent);
               if (Array.isArray(questions)) {
-                allQuestions.push(...questions.slice(0, chunkQuestionCount));
+                // Validate each question has required fields
+                const validQuestions = questions.filter(q => 
+                  q && 
+                  typeof q.question === 'string' && 
+                  Array.isArray(q.options) && 
+                  q.options.length === 4 &&
+                  typeof q.correctAnswer === 'number' &&
+                  q.correctAnswer >= 0 && q.correctAnswer <= 3 &&
+                  typeof q.explanation === 'string'
+                ).slice(0, chunkQuestionCount);
+                
+                allQuestions.push(...validQuestions);
+                console.log(`Successfully parsed ${validQuestions.length} questions from chunk ${i}`);
               }
             } catch (parseError) {
               console.error(`Failed to parse questions for chunk ${i}:`, parseError);
+              console.log(`Problematic content: ${content.substring(0, 200)}...`);
+              
+              // Retry with a simpler prompt if JSON parsing fails
+              try {
+                console.log(`Retrying chunk ${i} with simpler prompt...`);
+                const retryResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${openrouterApiKey}`,
+                    'HTTP-Referer': 'https://inquizzes.app',
+                    'X-Title': 'inQuizzes - Document Quiz Generator',
+                  },
+                  body: JSON.stringify({
+                    model: 'anthropic/claude-3-haiku',
+                    messages: [
+                      {
+                        role: 'user',
+                        content: `Create ${Math.min(chunkQuestionCount, 3)} multiple choice questions from this text. Return only valid JSON array format. Each question needs: id, question, options (4 choices), correctAnswer (0-3), explanation.
+
+Text: ${chunk.substring(0, 3000)}`
+                      }
+                    ],
+                    max_tokens: 2000,
+                    temperature: 0.5,
+                  }),
+                });
+                
+                if (retryResponse.ok) {
+                  const retryData = await retryResponse.json();
+                  const retryContent = retryData.choices?.[0]?.message?.content;
+                  if (retryContent) {
+                    const retryQuestions = JSON.parse(retryContent.replace(/```json\s*/g, '').replace(/```\s*/g, ''));
+                    if (Array.isArray(retryQuestions)) {
+                      const validRetryQuestions = retryQuestions.filter(q => 
+                        q && typeof q.question === 'string' && Array.isArray(q.options) && q.options.length === 4
+                      ).slice(0, Math.min(chunkQuestionCount, 3));
+                      allQuestions.push(...validRetryQuestions);
+                      console.log(`Retry successful: ${validRetryQuestions.length} questions from chunk ${i}`);
+                    }
+                  }
+                }
+              } catch (retryError) {
+                console.error(`Retry also failed for chunk ${i}:`, retryError);
+              }
             }
           }
         } catch (error) {
