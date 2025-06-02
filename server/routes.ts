@@ -156,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               'Authorization': `Bearer ${llamaApiKey}`,
             },
             body: JSON.stringify({
-              model: 'llama3.1-8b',
+              model: 'llama3-8b',
               messages: [
                 {
                   role: 'system',
@@ -246,7 +246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     'Authorization': `Bearer ${llamaApiKey}`,
                   },
                   body: JSON.stringify({
-                    model: 'llama3.1-8b',
+                    model: 'llama3-8b',
                     messages: [
                       {
                         role: 'user',
