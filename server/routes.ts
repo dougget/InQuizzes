@@ -149,7 +149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (chunkQuestionCount <= 0) break;
 
         try {
-          const response = await fetch('https://api.llama-api.com/chat/completions', {
+          const response = await fetch('https://api.llamaapi.com/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -239,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Retry with a simpler prompt if JSON parsing fails
               try {
                 console.log(`Retrying chunk ${i} with simpler prompt...`);
-                const retryResponse = await fetch('https://api.llama-api.com/chat/completions', {
+                const retryResponse = await fetch('https://api.llamaapi.com/chat/completions', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
