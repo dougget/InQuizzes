@@ -158,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               'X-Title': 'inQuizzes - Document Quiz Generator',
             },
             body: JSON.stringify({
-              model: 'openrouter/auto',
+              model: 'meta-llama/llama-3.1-8b-instruct:free',
               messages: [
                 {
                   role: 'system',
@@ -250,7 +250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     'X-Title': 'inQuizzes - Document Quiz Generator',
                   },
                   body: JSON.stringify({
-                    model: 'openrouter/auto',
+                    model: 'meta-llama/llama-3.1-8b-instruct:free',
                     messages: [
                       {
                         role: 'user',
