@@ -164,25 +164,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   role: 'system',
                   content: `You are an expert quiz generator. Create exactly ${chunkQuestionCount} high-quality multiple choice questions based ONLY on the specific facts, concepts, and information presented in the text content.
 
-                  STRICT REQUIREMENTS:
-                  - Questions must test understanding of specific facts, concepts, details, or relationships mentioned in the text
-                  - Focus on "what", "how", "why", "when", "where" questions about the content
-                  - Test comprehension of key ideas, processes, definitions, examples, or data presented
-                  - NEVER ask about document structure, format, purpose, or metadata
-                  - NEVER ask "What is the purpose of this document/PDF/text?"
-                  - NEVER ask about the author's intent unless explicitly discussed in the content
-                  - Each question should reference specific information that can be found in the text
+                  CONTENT FOCUS:
+                  - Test understanding of specific facts, concepts, details, or relationships mentioned in the text
+                  - Focus on key ideas, processes, definitions, examples, data, procedures, or technical details
+                  - Each question must reference specific information that can be found in the text
                   - All 4 answer options should be plausible and related to the topic
-                  - Include brief explanations that cite specific text content
 
-                  RETURN ONLY VALID JSON - no extra text, explanations, or markdown:
+                  FORBIDDEN TOPICS:
+                  - NEVER ask about document structure, format, purpose, metadata, chapters, or sections
+                  - NEVER ask "What is the purpose of this document/PDF/text/chapter?"
+                  - NEVER ask about the author, writer, or their intent unless explicitly discussed in the content
+                  - NEVER ask about document organization or layout
+
+                  QUESTION VARIETY - Use diverse question formats:
+                  - "Which of the following..." (testing specific facts)
+                  - "What happens when..." (testing cause-effect relationships)  
+                  - "How does..." (testing processes or mechanisms)
+                  - "Why is..." (testing reasoning or explanations)
+                  - "In what situation would..." (testing application)
+                  - "What is the main difference between..." (testing comparisons)
+                  - "Which statement is true about..." (testing comprehension)
+                  - "What would be the result if..." (testing consequences)
+
+                  EXPLANATION VARIETY - Avoid repetitive phrases:
+                  - "The text explains that..."
+                  - "This is because..."
+                  - "The content describes..."
+                  - "As stated in the material..."
+                  - "The information shows..."
+                  - "This occurs when..."
+
+                  RETURN ONLY VALID JSON:
                   [
                     {
                       "id": "q1",
-                      "question": "Based on the text, what specific [fact/concept/process] is described?",
+                      "question": "Which of the following best describes [specific concept]?",
                       "options": ["Option A", "Option B", "Option C", "Option D"],
                       "correctAnswer": 0,
-                      "explanation": "According to the text, [specific reference to content]"
+                      "explanation": "The text explains that [specific details without repetitive phrasing]"
                     }
                   ]`
                 },
@@ -313,11 +332,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     messages: [
                       {
                         role: 'user',
-                        content: `Create ${Math.min(chunkQuestionCount, 3)} multiple choice questions about specific facts and concepts in this text. Do NOT ask about document purpose or structure.
+                        content: `Create ${Math.min(chunkQuestionCount, 3)} varied multiple choice questions about specific facts and concepts. 
 
-Focus on: what specific information is presented, how processes work, why things happen, when events occur, where things take place.
+AVOID: document purpose, structure, chapters, author questions, repetitive "According to the text" phrases.
 
-Return ONLY valid JSON: [{"id":"q1","question":"What specific fact/concept from the text?","options":["A","B","C","D"],"correctAnswer":0,"explanation":"According to the text..."}]
+USE VARIED FORMATS: "Which of the following...", "What happens when...", "How does...", "Why is...", "What would result if..."
+
+Return ONLY valid JSON: [{"id":"q1","question":"Which of the following describes [concept]?","options":["A","B","C","D"],"correctAnswer":0,"explanation":"This occurs because [details]"}]
 
 Text: ${chunk.substring(0, 3000)}`
                       }
