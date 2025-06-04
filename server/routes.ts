@@ -158,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               'X-Title': 'inQuizzes - Document Quiz Generator',
             },
             body: JSON.stringify({
-              model: 'anthropic/claude-3-haiku',
+              model: 'anthropic/claude-3.5-sonnet',
               messages: [
                 {
                   role: 'system',
@@ -218,27 +218,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 cleanedContent = jsonMatch[0];
               }
               
-              // Fix common JSON issues - more aggressive cleaning
+              // Fix common JSON issues - more aggressive cleaning for truncated responses
               cleanedContent = cleanedContent
                 .replace(/,\s*\]/g, ']')              // Remove trailing commas in arrays
                 .replace(/,\s*\}/g, '}')              // Remove trailing commas in objects
-                .replace(/\.\.\./g, '')               // Remove ellipsis that break JSON
+                .replace(/\.\.\./g, '"')              // Replace ellipsis with quote to close strings
                 .replace(/"\s*\.\.\./g, '"')          // Remove ellipsis after quotes
+                .replace(/\.\.\.\s*$/g, '"')          // Handle ellipsis at end of content
+                .replace(/"\s*[^"]*\.\.\.[^"]*$/g, '"') // Clean up any incomplete strings ending with ellipsis
                 .replace(/\n/g, ' ')                  // Replace newlines with spaces
                 .replace(/\s+/g, ' ')                 // Normalize whitespace
                 .replace(/([^"])\s*\n\s*([^"])/g, '$1 $2'); // Join broken lines
               
-              // Try to fix incomplete JSON arrays by closing them properly
+              // Handle incomplete JSON arrays more robustly
               if (cleanedContent.includes('[') && !cleanedContent.endsWith(']')) {
-                // Count open vs closed brackets to see if we need to close
-                const openBrackets = (cleanedContent.match(/\[/g) || []).length;
-                const closeBrackets = (cleanedContent.match(/\]/g) || []).length;
-                if (openBrackets > closeBrackets) {
-                  // Try to find the last complete object and close the array there
-                  const lastCompleteObject = cleanedContent.lastIndexOf('}');
-                  if (lastCompleteObject > -1) {
-                    cleanedContent = cleanedContent.substring(0, lastCompleteObject + 1) + ']';
+                // Find the last properly closed object
+                let lastValidEnd = -1;
+                let braceCount = 0;
+                let inString = false;
+                let escaped = false;
+                
+                for (let i = 0; i < cleanedContent.length; i++) {
+                  const char = cleanedContent[i];
+                  
+                  if (escaped) {
+                    escaped = false;
+                    continue;
                   }
+                  
+                  if (char === '\\') {
+                    escaped = true;
+                    continue;
+                  }
+                  
+                  if (char === '"') {
+                    inString = !inString;
+                    continue;
+                  }
+                  
+                  if (!inString) {
+                    if (char === '{') {
+                      braceCount++;
+                    } else if (char === '}') {
+                      braceCount--;
+                      if (braceCount === 0) {
+                        lastValidEnd = i;
+                      }
+                    }
+                  }
+                }
+                
+                // If we found a complete object, truncate there and close the array
+                if (lastValidEnd > -1) {
+                  cleanedContent = cleanedContent.substring(0, lastValidEnd + 1) + ']';
+                } else {
+                  // Fallback: just add closing bracket
+                  cleanedContent += ']';
                 }
               }
               
@@ -274,7 +309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     'X-Title': 'inQuizzes - Document Quiz Generator',
                   },
                   body: JSON.stringify({
-                    model: 'anthropic/claude-3-haiku',
+                    model: 'anthropic/claude-3.5-sonnet',
                     messages: [
                       {
                         role: 'user',
