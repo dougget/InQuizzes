@@ -162,22 +162,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
               messages: [
                 {
                   role: 'system',
-                  content: `You are an expert quiz generator. Create exactly ${chunkQuestionCount} high-quality, content-focused multiple choice questions based on the provided text. Each question should:
-                  1. Be elaborate and test deep understanding
-                  2. Focus purely on content, not metadata or structure
-                  3. Have 4 options with only one correct answer
-                  4. Include a brief explanation for the correct answer
-                  
-                  CRITICAL: Return ONLY valid JSON. No extra text, no explanations, no markdown. Just the JSON array.
-                  
-                  Use this exact format (replace ... with actual content, do NOT include ...):
+                  content: `You are an expert quiz generator. Create exactly ${chunkQuestionCount} high-quality multiple choice questions based ONLY on the specific facts, concepts, and information presented in the text content.
+
+                  STRICT REQUIREMENTS:
+                  - Questions must test understanding of specific facts, concepts, details, or relationships mentioned in the text
+                  - Focus on "what", "how", "why", "when", "where" questions about the content
+                  - Test comprehension of key ideas, processes, definitions, examples, or data presented
+                  - NEVER ask about document structure, format, purpose, or metadata
+                  - NEVER ask "What is the purpose of this document/PDF/text?"
+                  - NEVER ask about the author's intent unless explicitly discussed in the content
+                  - Each question should reference specific information that can be found in the text
+                  - All 4 answer options should be plausible and related to the topic
+                  - Include brief explanations that cite specific text content
+
+                  RETURN ONLY VALID JSON - no extra text, explanations, or markdown:
                   [
                     {
                       "id": "q1",
-                      "question": "Your question here?",
+                      "question": "Based on the text, what specific [fact/concept/process] is described?",
                       "options": ["Option A", "Option B", "Option C", "Option D"],
                       "correctAnswer": 0,
-                      "explanation": "Brief explanation"
+                      "explanation": "According to the text, [specific reference to content]"
                     }
                   ]`
                 },
@@ -273,9 +278,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     messages: [
                       {
                         role: 'user',
-                        content: `Create ${Math.min(chunkQuestionCount, 3)} multiple choice questions. Return ONLY valid JSON array. No extra text before or after. No ellipsis (...). Complete all fields.
+                        content: `Create ${Math.min(chunkQuestionCount, 3)} multiple choice questions about specific facts and concepts in this text. Do NOT ask about document purpose or structure.
 
-Format: [{"id":"q1","question":"Question text?","options":["A","B","C","D"],"correctAnswer":0,"explanation":"Brief explanation"}]
+Focus on: what specific information is presented, how processes work, why things happen, when events occur, where things take place.
+
+Return ONLY valid JSON: [{"id":"q1","question":"What specific fact/concept from the text?","options":["A","B","C","D"],"correctAnswer":0,"explanation":"According to the text..."}]
 
 Text: ${chunk.substring(0, 3000)}`
                       }
