@@ -8,7 +8,7 @@ Upload your PDF documents and let AI generate a quiz for you!
 
 ## Screenshot
 
-![inQuizzes Screenshot](./attached_assets/Screenshot%202025-06-04%20at%2016.27.14_1749071212588.png)
+![inQuizzes Screenshot](./attached_assets/Screenshot.png)
 
 ---
 
@@ -66,4 +66,4 @@ Pull requests are welcome! For major changes, please open an issue first to disc
 ---
 
 ## License
-[MIT](LICENSE)
+[MIT](./LICENSE)
