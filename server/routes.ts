@@ -21,6 +21,10 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint for Docker
+  app.get('/api/health', (_req, res) => {
+    res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+  });
   // Process PDF files and extract text content
   app.post("/api/process-pdf", upload.single('pdf'), async (req: any, res) => {
     try {
