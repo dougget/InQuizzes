@@ -168,14 +168,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   3. Have 4 options with only one correct answer
                   4. Include a brief explanation for the correct answer
                   
-                  Return ONLY a JSON array with this exact format:
+                  CRITICAL: Return ONLY valid JSON. No extra text, no explanations, no markdown. Just the JSON array.
+                  
+                  Use this exact format (replace ... with actual content, do NOT include ...):
                   [
                     {
-                      "id": "unique_id",
-                      "question": "question text",
-                      "options": ["option1", "option2", "option3", "option4"],
+                      "id": "q1",
+                      "question": "Your question here?",
+                      "options": ["Option A", "Option B", "Option C", "Option D"],
                       "correctAnswer": 0,
-                      "explanation": "explanation text"
+                      "explanation": "Brief explanation"
                     }
                   ]`
                 },
@@ -211,12 +213,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 cleanedContent = jsonMatch[0];
               }
               
-              // Fix common JSON issues
+              // Fix common JSON issues - more aggressive cleaning
               cleanedContent = cleanedContent
-                .replace(/,\s*\]/g, ']')  // Remove trailing commas in arrays
-                .replace(/,\s*\}/g, '}')  // Remove trailing commas in objects
-                .replace(/\n/g, ' ')      // Replace newlines with spaces
-                .replace(/\s+/g, ' ');    // Normalize whitespace
+                .replace(/,\s*\]/g, ']')              // Remove trailing commas in arrays
+                .replace(/,\s*\}/g, '}')              // Remove trailing commas in objects
+                .replace(/\.\.\./g, '')               // Remove ellipsis that break JSON
+                .replace(/"\s*\.\.\./g, '"')          // Remove ellipsis after quotes
+                .replace(/\n/g, ' ')                  // Replace newlines with spaces
+                .replace(/\s+/g, ' ')                 // Normalize whitespace
+                .replace(/([^"])\s*\n\s*([^"])/g, '$1 $2'); // Join broken lines
+              
+              // Try to fix incomplete JSON arrays by closing them properly
+              if (cleanedContent.includes('[') && !cleanedContent.endsWith(']')) {
+                // Count open vs closed brackets to see if we need to close
+                const openBrackets = (cleanedContent.match(/\[/g) || []).length;
+                const closeBrackets = (cleanedContent.match(/\]/g) || []).length;
+                if (openBrackets > closeBrackets) {
+                  // Try to find the last complete object and close the array there
+                  const lastCompleteObject = cleanedContent.lastIndexOf('}');
+                  if (lastCompleteObject > -1) {
+                    cleanedContent = cleanedContent.substring(0, lastCompleteObject + 1) + ']';
+                  }
+                }
+              }
               
               const questions = JSON.parse(cleanedContent);
               if (Array.isArray(questions)) {
@@ -254,7 +273,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     messages: [
                       {
                         role: 'user',
-                        content: `Create ${Math.min(chunkQuestionCount, 3)} multiple choice questions from this text. Return only valid JSON array format. Each question needs: id, question, options (4 choices), correctAnswer (0-3), explanation.
+                        content: `Create ${Math.min(chunkQuestionCount, 3)} multiple choice questions. Return ONLY valid JSON array. No extra text before or after. No ellipsis (...). Complete all fields.
+
+Format: [{"id":"q1","question":"Question text?","options":["A","B","C","D"],"correctAnswer":0,"explanation":"Brief explanation"}]
 
 Text: ${chunk.substring(0, 3000)}`
                       }
