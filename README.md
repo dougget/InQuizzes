@@ -14,11 +14,11 @@ Upload your PDF documents and let AI generate a quiz for you!
 
 ## Features
 - Upload PDF documents (up to 15MB)
-- AI generates intelligent multiple-choice questions using Claude 3.5 Sonnet
+- AI generates intelligent multiple-choice questions
 - Adjustable number of questions (1-50)
 - Interactive quiz interface with scoring and explanations
 - Dark/light theme support
-- Automatic file cleanup after 6 hours
+- Automatic file cleanup.
 
 ---
 
@@ -26,7 +26,7 @@ Upload your PDF documents and let AI generate a quiz for you!
 
 ### Prerequisites
 - [Docker](https://www.docker.com/) installed on your machine
-- [OpenRouter API Key](https://openrouter.ai/) for Claude 3.5 Sonnet
+- [OpenRouter API Key](https://openrouter.ai/)
 
 ### Running with Docker
 1. Clone this repository:
